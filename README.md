@@ -1,6 +1,6 @@
 # CI-Visualization
 
-##1. Create a JSON config file:
+## 1. Create a JSON config file:
 ```json
 {
   "db-path": "/home/example/example.db",
@@ -13,7 +13,7 @@ per hour. **Don't give it any rights**
 
 
 ## 2. Run the python script to fetch data to the DB
-###2.1 By calling it directly and let it run in the background
+By calling it directly and let it run in the background
 Here an example with `tmux`
 ```bash
 $ tmux new -s civi
@@ -22,5 +22,5 @@ $ # then you can just detach with ctrl + b then d
 $ # and attach with tmux attach-session civi
 ```
 
-###2.2 Or by runnig it as a systemd service
+Or by runnig it as a systemd service
 WIP
