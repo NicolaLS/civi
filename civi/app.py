@@ -4,9 +4,14 @@ import json
 import aiohttp
 import aiosqlite
 from aiosqlite import IntegrityError
+import sys
 
 # dont do this
 REPO_URL = None
+
+async def log(msg):
+    print(msg)
+    sys.stdout.flush()
 
 async def init_db(db):
     # create sync state table
@@ -52,11 +57,11 @@ async def sync(tag, db, session, endpoint):
    total_count = None
    # we already fetched this page so we want to fetch the next
    page = page + 1
-   print(f'{tag}: syncing from {page}')
+   await log(f'{tag}: syncing from {page}')
 
    while True:
     new_total_count, elements = await fetch_elements(tag, session, endpoint, page)
-    print(f'{tag}: fetched {len(elements)} elements')
+    await log(f'{tag}: fetched {len(elements)} elements')
 
     if total_count is None:
         total_count = new_total_count
@@ -68,7 +73,7 @@ async def sync(tag, db, session, endpoint):
 
     # ids of inserted elements
     inserted = await insert_elements(tag, db, elements)
-    print(f'{tag}: wrote {len(inserted)} to db')
+    await log(f'{tag}: wrote {len(inserted)} to db')
     if not tag.startswith('jobs'):
         await update_state(tag, db, page, ignore_elements)
 
@@ -83,11 +88,11 @@ async def sync(tag, db, session, endpoint):
         break
 
     max_ignore = min(100, ignore_elements)
-    print(f'{tag} ignoring {max_ignore}')
+    await log(f'{tag} ignoring {max_ignore}')
     if len(inserted) < len(elements) - max_ignore or len(elements) == 0:
         # we didn't write all elements this means we reached to already synced state
         ignore_elements = ignore_elements - max_ignore
-        print(ignore_elements)
+        await log(ignore_elements)
         page = 0 #reset page
         await update_state(tag, db, page, ignore_elements) # ignore should be 0
         break
@@ -130,10 +135,10 @@ async def insert_elements(tag, db, elements):
             ids.append(e['id'])
         except IntegrityError as ie:
             id = e['id']
-            print(f'{tag}: {ie} reached duplicates for id: {id}')
+            await log(f'{tag}: {ie} reached duplicates for id: {id}')
             continue # should break here but just to debug continue
         except Exception as e:
-            print(f'{tag}: OTHER DB ERROR {e}')
+            await log(f'{tag}: OTHER DB ERROR {e}')
     return ids
 
 
@@ -143,13 +148,13 @@ async def fetch_elements(tag, session, endpoint,  page):
     while True:
         resp = await session.get(REPO_URL + endpoint + '?per_page=100&page=' + str(page))
         remaining = resp.headers.get('x-ratelimit-remaining')
-        print(f'{tag} remaining requests: {remaining}')
+        await log(f'{tag} remaining requests: {remaining}')
         if remaining == None:
-            print(f'{tag}: probably secondary rate-limit due to async (job) requests. waiting 180sec')
-            print(await resp.text())
+            await log(f'{tag}: probably secondary rate-limit due to async (job) requests. waiting 180sec')
+            await log(await resp.text())
             await asyncio.sleep(121)
         elif int(remaining) == 0:
-            print(f'{tag}: rate-limit exceeded. waiting 1 hour')
+            await log(f'{tag}: rate-limit exceeded. waiting 1 hour')
             await asyncio.sleep(3600)
         elif resp.status == 200:
             break
@@ -183,5 +188,5 @@ async def main(DB_PATH, TOKEN):
         REPO_URL = '/repos/fedimint/fedimint'
         while True:
             await sync('runs-0', db, session, '/actions/runs')
-            print('finished syncing, waiting one hour..')
+            await log('finished syncing, waiting one hour..')
             await asyncio.sleep(3600)

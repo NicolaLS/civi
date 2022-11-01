@@ -1,6 +1,8 @@
 # CI-Visualization
 
 ## 1. Create a JSON config file:
+Disclaimer there is no visualization yet just fetching the data to db with a long running system service
+
 ```json
 {
   "db-path": "/home/example/example.db",
@@ -13,7 +15,7 @@ per hour. **Don't give it any rights**
 
 
 ## 2. Run the python script to fetch data to the DB
-By calling it directly and let it run in the background
+# By calling it directly and let it run in the background
 Here an example with `tmux`
 ```bash
 $ tmux new -s civi
@@ -22,5 +24,17 @@ $ # then you can just detach with ctrl + b then d
 $ # and attach with tmux attach-session civi
 ```
 
-Or by runnig it as a systemd service
-WIP
+# Or by runnig it as a systemd service
+1. Edit the `civi.service` file and fill in the correct values for the placeholders, then copy it to `/etc/systemd/system/civi.service`
+2. Run this in your shell:
+```bash
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable civi.service
+$ sudo systemctl start civi.service
+$ # check the status and see if it runs correctly
+$ systemctl status civi.service
+$ journalctl -u civi.service -f
+```
+
+
+

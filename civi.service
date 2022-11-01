@@ -1,0 +1,11 @@
+[Unit]
+Description=Fetch Github-CI data to a database and create a static visualization website
+After=network.target
+
+[Service]
+User=<USER>
+WorkingDirectory=<ABSOLUTE_PATH_TO_REPO>
+ExecStart=<ABSOLUTE_PATH_TO_PYTHON3> -m civi <ASOLUTE_PATH_TO_CONFIG_JSON_FILE> 
+
+[Install]
+WantedBy=multi-user.target
