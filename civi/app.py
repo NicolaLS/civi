@@ -1,4 +1,5 @@
 import asyncio
+from codecs import ignore_errors
 import json
 import aiohttp
 import aiosqlite
@@ -12,9 +13,9 @@ async def init_db(db):
     await db.execute("""CREATE TABLE IF NOT EXISTS state (
                 id TEXT PRIMARY KEY,
                 page INTEGER,
-                total_pages INTEGER
+                ignore_elements INTEGER
                 )
-               """);
+               """)
     await db.commit()
 
     #create runs table
@@ -47,35 +48,29 @@ async def init_db(db):
 
 async def sync(tag, db, session, endpoint):
    # fetch the state in case we are resuming (if we have lets say 50% synced, then stop&resume it would think it reached the end due to duplicates)
-   page, total_pages = await get_state(tag, db)
+   page, ignore_elements = await get_state(tag, db)
+   total_count = None
    # we already fetched this page so we want to fetch the next
    page = page + 1
    print(f'{tag}: syncing from {page}')
 
    while True:
-    new_last, elements = await fetch_elements(tag, session, endpoint, page)
+    new_total_count, elements = await fetch_elements(tag, session, endpoint, page)
     print(f'{tag}: fetched {len(elements)} elements')
 
-    if total_pages is None:
-        # there was no state initialized in the db
-        total_pages = new_last
-    elif total_pages < new_last:
-        # d new pages were added in between requests !
-        # this means we did not fetch page i but i-d
-        # we need to skip this (or else we will stop due to duplicates)
-        # and shift our 'cursor' by the delta (page)
-        delta = new_last - total_pages
-        print(f'{tag}: {delta} new pages were added in between requests')
-        page = page + delta
-        total_pages = new_last
-        # notice we don't update the state in the DB yet.
-        # this is because if we fail here we want to come to the same
-        # conclusion and try to skip & shift again
-        continue
-    
+    if total_count is None:
+        total_count = new_total_count
+    elif total_count < new_total_count:
+        # there were elements added in between
+        delta = new_total_count - total_count
+        ignore_elements = ignore_elements + delta
+        await update_state(tag, db, page, ignore_elements) # in jobs this should never happen anyway
+
     # ids of inserted elements
     inserted = await insert_elements(tag, db, elements)
-    await update_state(tag, db, page, total_pages)
+    print(f'{tag}: wrote {len(inserted)} to db')
+    if not tag.startswith('jobs'):
+        await update_state(tag, db, page, ignore_elements)
 
     if not tag.startswith('jobs'):
         # if we just fetched the runs we want to fetch all the jobs for each run
@@ -87,32 +82,37 @@ async def sync(tag, db, session, endpoint):
         # start again we just stop here (we also don't care for duplicates)
         break
 
-    if len(inserted) < len(elements) or page == total_pages:
+    max_ignore = min(100, ignore_elements)
+    print(f'{tag} ignoring {max_ignore}')
+    if len(inserted) < len(elements) - max_ignore or len(elements) == 0:
         # we didn't write all elements this means we reached to already synced state
-        # or we fetched the last page
+        ignore_elements = ignore_elements - max_ignore
+        print(ignore_elements)
         page = 0 #reset page
-        await update_state(tag, db, page, total_pages)
+        await update_state(tag, db, page, ignore_elements) # ignore should be 0
         break
 
+    ignore_elements = ignore_elements - max_ignore
+    await update_state(tag, db, page, ignore_elements)
     page = page + 1
 
 
 async def get_state(tag, db):
-    c = await db.execute("""SELECT page, total_pages FROM state
+    c = await db.execute("""SELECT page, ignore_elements FROM state
     WHERE id=?
     """, (tag,))
 
     result = await c.fetchall() # dont use fetchall?
 
     if not result:
-        return (0, None)
+        return (0, 0)
     else:
         return result[0]
 
-async def update_state(tag, db, page, total_pages):
+async def update_state(tag, db, page, ignore):
     await db.execute(""" INSERT OR REPLACE INTO state
     VALUES(?, ?, ?)
-    """, (tag, page, total_pages))
+    """, (tag, page, ignore))
     await db.commit()
 
 async def insert_elements(tag, db, elements):
@@ -129,8 +129,11 @@ async def insert_elements(tag, db, elements):
             await db.commit()
             ids.append(e['id'])
         except IntegrityError as ie:
-            print(f'{tag}: reached duplicates')
-            break
+            id = e['id']
+            print(f'{tag}: {ie} reached duplicates for id: {id}')
+            continue # should break here but just to debug continue
+        except Exception as e:
+            print(f'{tag}: OTHER DB ERROR {e}')
     return ids
 
 
@@ -139,15 +142,16 @@ async def fetch_elements(tag, session, endpoint,  page):
 
     while True:
         resp = await session.get(REPO_URL + endpoint + '?per_page=100&page=' + str(page))
-        remaining = int(resp.headers.get('x-ratelimit-remaining'))
-        if remaining == 0:
+        remaining = resp.headers.get('x-ratelimit-remaining')
+        print(f'{tag} remaining requests: {remaining}')
+        if remaining == None:
+            print(f'{tag}: probably secondary rate-limit due to async (job) requests. waiting 180sec')
+            print(await resp.text())
+            await asyncio.sleep(121)
+        elif int(remaining) == 0:
             print(f'{tag}: rate-limit exceeded. waiting 1 hour')
             await asyncio.sleep(3600)
-        elif resp.status == 403:
-            print(f'{tag}: got status 403. probably secondary rate-limit due to async (job) requests. waiting 180sec')
-            print(await resp.text())
-            await asyncio.sleep(180)
-        else:
+        elif resp.status == 200:
             break
 
     data = await resp.json()
@@ -163,11 +167,9 @@ async def fetch_elements(tag, session, endpoint,  page):
             vals['raw'] = json.dumps(e, indent=4)
             elements.append(vals)
     
-    last_page = page
-    if 'last' in resp.links:
-        last_page = resp.links.get('last').get('url').query['page']
+    total_count = data['total_count']
     
-    return (int(last_page), elements)
+    return (int(total_count), elements)
 
 async def main(DB_PATH, TOKEN):
     #TODO as cmd arg
