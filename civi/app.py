@@ -146,7 +146,11 @@ async def fetch_elements(tag, session, endpoint,  page):
     resp = None
 
     while True:
-        resp = await session.get(REPO_URL + endpoint + '?per_page=100&page=' + str(page))
+        try:
+            resp = await session.get(REPO_URL + endpoint + '?per_page=100&page=' + str(page))
+        except Exception as e:
+            await log(f'{tag} request failed got error: {e}')
+            await asyncio.sleep(60)
         remaining = resp.headers.get('x-ratelimit-remaining')
         await log(f'{tag} remaining requests: {remaining}')
         if remaining == None:
