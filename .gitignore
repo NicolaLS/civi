@@ -1,2 +1,4 @@
 civi/__pycache__
 *.db
+config.json
+plots/*

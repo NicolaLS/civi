@@ -6,6 +6,8 @@ import aiosqlite
 from aiosqlite import IntegrityError
 import sys
 
+from civi import vi
+
 # dont do this
 REPO_URL = None
 
@@ -192,5 +194,8 @@ async def main(DB_PATH, TOKEN):
         REPO_URL = '/repos/fedimint/fedimint'
         while True:
             await sync('runs-0', db, session, '/actions/runs')
-            await log('finished syncing, waiting one hour..')
+            await db.close()
+            vi.visualize(DB_PATH)
+            db = await aiosqlite.connect(DB_PATH)
+            await log('finished, waiting one hour..')
             await asyncio.sleep(3600)
