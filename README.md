@@ -1,8 +1,8 @@
 # CI-Visualization
 
-## 1. Create a JSON config file:
-Disclaimer there is no visualization yet just fetching the data to db with a long running system service
+Running this module will fetch the CI data from github and produce plots which will be safed in `civi/plots` (not `civi/civi/plots`!)
 
+## 1. Create a JSON config file:
 ```json
 {
   "db-path": "/home/example/example.db",
