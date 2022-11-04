@@ -1,0 +1,57 @@
+CREATE TABLE state (
+                id TEXT PRIMARY KEY,
+                page INTEGER,
+                ignore_elements INTEGER
+                );
+CREATE TABLE workflows (
+                id INTEGER PRIMARY KEY,
+                node_id TEXT,
+                name TEXT,
+                path TEXT,
+                state TEXT,
+                created_at NUMERICAL,
+                updated_at NUMERICAL,
+                );
+CREATE TABLE runs (
+              id INTEGER PRIMARY KEY,
+              name TEXT,
+              workflow_id integer REFERENCES workflows,
+              node_id TEXT,
+              head_branch TEXT,
+              head_sha TEXT,
+              path TEXT,
+              display_title TEXT,
+              run_number INTEGER,
+              event TEXT,
+              status TEXT,
+              conclusion TEXT,
+              check_suite_id TEXT,
+              check_suite_node_id TEXT,
+              created_at NUMERICAL,
+              updated_at NUMERICAL,
+              actor TEXT
+              run_attempt INTEGER,
+              run_started_at NUMERICAL,
+              triggering_actor TEXT,
+              );
+CREATE TABLE jobs (
+              id INTEGER PRIMARY KEY,
+              run_id INTEGER REFERENCES runs,
+              run_attempt INTEGER,
+              node_id TEXT,
+              head_sha TEXT,
+              status TEXT,
+              conclusion TEXT,
+              started_at NUMERICAL,
+              completed_at NUMERICAL,
+              name TEXT,
+              labels TEXT,
+              runner_id INTEGER,
+              runner_name TEXT,
+              runner_group_id INTEGER,
+              runner_group_name TEXT,
+              steps BLOB
+              );
+
+
+

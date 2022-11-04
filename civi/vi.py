@@ -34,7 +34,7 @@ def per_wf_data(id):
         
         placeholder= '?' # For SQLite. See DBAPI paramstyle.
         placeholders= ', '.join(placeholder for unused in relevant_job_names)
-        query = 'SELECT * FROM jobs WHERE run_id=? AND name IN (%s)' % placeholders
+        query = 'SELECT id, run_id, name, conclusion, started_at, completed_at FROM jobs WHERE run_id=? AND name IN (%s)' % placeholders
         cursor.execute(query, (run[0], *relevant_job_names))
         
         # (id, run_id, name, conclusion, started_at, completed_at, raw)

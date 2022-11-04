@@ -25,31 +25,69 @@ async def init_db(db):
                """)
     await db.commit()
 
+    # create workflows table
+    # await db.execute("""
+    # CREATE TABLE IF NOT EXISTS workflows (
+    #             id INTEGER PRIMARY KEY,
+    #             node_id TEXT,
+    #             name TEXT,
+    #             path TEXT,
+    #             state TEXT,
+    #             created_at NUMERICAL,
+    #             updated_at NUMERICAL,
+    #             );
+    # """)
+
+    # await db.commit()
+
     #create runs table
     await db.execute("""
-              CREATE TABLE IF NOT EXISTS runs (
+    CREATE TABLE IF NOT EXISTS runs (
               id INTEGER PRIMARY KEY,
-              workflow_id integer,
+              name TEXT,
+              workflow_id INTEGER,
+              node_id TEXT,
+              head_branch TEXT,
+              head_sha TEXT,
+              path TEXT,
+              display_title TEXT,
               run_number INTEGER,
-              created_at NUMERICAL,
+              event TEXT,
               status TEXT,
-              raw BLOB
+              conclusion TEXT,
+              check_suite_id TEXT,
+              check_suite_node_id TEXT,
+              created_at NUMERICAL,
+              updated_at NUMERICAL,
+              actor TEXT
+,
+              run_attempt INTEGER,
+              run_started_at NUMERICAL,
+              triggering_actor TEXT
               )
               """)
     await db.commit()
 
     #create jobs table
     await db.execute("""
-              CREATE TABLE IF NOT EXISTS jobs (
-              id INTEGER PRIMARY KEY,
-              run_id INTEGER REFERENCES runs,
-              name TEXT,
-              conclusion TEXT,
-              started_at NUMERICAL,
-              completed_at NUMERICAL,
-              raw BLOB
-              )
-              """)
+    CREATE TABLE IF NOT EXISTS jobs (
+            id INTEGER PRIMARY KEY,
+            run_id INTEGER REFERENCES runs,
+            run_attempt INTEGER,
+            node_id TEXT,
+            head_sha TEXT,
+            status TEXT,
+            conclusion TEXT,
+            started_at NUMERICAL,
+            completed_at NUMERICAL,
+            name TEXT,
+            runner_id INTEGER,
+            runner_name TEXT,
+            runner_group_id INTEGER,
+            runner_group_name TEXT,
+            steps BLOB
+            )
+            """)
 
     await db.commit()
 
@@ -124,9 +162,9 @@ async def update_state(tag, db, page, ignore):
 
 async def insert_elements(tag, db, elements):
     query = """INSERT INTO runs
-    VALUES(:id, :workflow_id, :run_number, :created_at, :status, :raw)
+    VALUES(:id, :name, :workflow_id, :node_id, :head_branch, :head_sha, :path, :display_title, :run_number, :event, :status, :conclusion, :check_suite_id, :check_suite_node_id, :created_at, :updated_at, :actor, :run_attempt, :run_started_at, :triggering_actor)
     """ if tag.startswith('runs') else """INSERT INTO jobs
-    VALUES(:id, :run_id, :name, :conclusion, :started_at, :completed_at, :raw)
+    VALUES(:id, :run_id, :run_attempt, :node_id, :head_sha, :status, :conclusion, :started_at, :completed_at, :name, :runner_id, :runner_name, :runner_group_id, :runner_group_name, :steps)
     """
 
     ids = []
@@ -170,12 +208,20 @@ async def fetch_elements(tag, session, endpoint,  page):
     elements = []
     for e in data[key]:
         if key == 'workflow_runs':
-            vals = { k: e[k] for k in ('id', 'workflow_id', 'run_number', 'created_at', 'status') }
-            vals['raw'] = json.dumps(e, indent=4)
+            vals = { k: e[k] for k in ('id', 'name', 'workflow_id', 'node_id',
+            'head_branch', 'head_sha', 'path', 'display_title',
+             'run_number', 'event', 'status', 'conclusion',
+              'check_suite_id', 'check_suite_node_id', 'created_at', 'updated_at',
+               'run_attempt', 'run_started_at') }
+
+            actor = e.get('actor')
+            vals['actor'] = str(actor.get('login')) if actor else str(None)
+            triggering_actor = e.get('triggering_actor')
+            vals['triggering_actor'] = str(triggering_actor.get('login')) if triggering_actor else str(None) 
             elements.append(vals)
         else:
-            vals = { k: e[k] for k in ('id', 'run_id', 'name', 'conclusion', 'started_at', 'completed_at') }
-            vals['raw'] = json.dumps(e, indent=4)
+            vals = { k: e[k] for k in ('id', 'run_id', 'run_attempt', 'node_id', 'head_sha', 'status', 'name', 'conclusion', 'started_at', 'completed_at', 'runner_id', 'runner_name', 'runner_group_id', 'runner_group_name') }
+            vals['steps'] = json.dumps(e.get('steps'), indent=2)
             elements.append(vals)
     
     total_count = data['total_count']
