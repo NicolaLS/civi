@@ -15,6 +15,7 @@ per hour. **Don't give it any rights**
 
 
 ## 2. Run the python script to fetch data to the DB
+**You also need to create a `plots` directory in the root dir (this dir) or the script will fail!**
 ### By calling it directly and let it run in the background
 Here an example with `tmux`
 ```bash
