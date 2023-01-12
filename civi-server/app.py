@@ -22,15 +22,15 @@ app = Flask(__name__)
 # dataframe in a lock which will get updated after every sync
 # cycle.
 
+# probably naive way of doing cfg
+cfg_file = open('config.json')
+cfg = json.loads(cfg_file.read())
+
+db_path = cfg['db-path']
+gh_token = cfg['auth-token']
+
 def syncer_worker(lock):
   global df # bad ik
-
-  # probably naive way of doing cfg
-  cfg_file = open('config.json')
-  cfg = json.loads(cfg_file.read())
-
-  db_path = cfg['db-path']
-  gh_token = cfg['auth-token']
 
   while True:
     # run the syncer
@@ -53,7 +53,7 @@ def syncer_worker(lock):
     time.sleep(3600)
 
 # connect to DB we can set check_same_thread=False because we use a lock
-conn = sqlite3.connect('/home/sus/Documents/civi/meta/civi.db', check_same_thread=False)
+conn = sqlite3.connect(db_path, check_same_thread=False)
 lock = threading.Lock()
 # we don't need to use the lock yet, since the syncer_worker hasn't started
 df = pd.read_sql("""SELECT jobs.id, jobs.run_id, jobs.run_attempt, jobs.started_at, jobs.completed_at, 
