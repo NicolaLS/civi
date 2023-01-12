@@ -99,16 +99,20 @@ def job(wf_id, job_name):
     data = proccess_data(wf_id, job_name, conclusion, method, interval, rolling)
     return data
 
-def proccess_data(wf_id, name, conclusion='both', method='mean', interval='d', rolling=None):
-  data_df = df[(df['name'] == name) & (df['workflow_id'] == wf_id)]
-  if conclusion != 'both':
-    data_df = data_df[data_df['conclusion'] == conclusion]
+def proccess_data(wf_id, name, conclusion=None, method='mean', interval='d', rolling=None):
+  data_df = df[(df['name'] == name) & (df['workflow_id'] == int(wf_id))]
+
+  print(data_df.info())
+
+  if conclusion is not None:
+    data_df.drop(data_df[data_df['conclusion'] != conclusion].index, inplace=True)
     # this can make the server crash if api consumer sets conclusion wrong
 
+  print(data_df.info())
   if method == 'mean':
-    data_df = df.loc[df['name'] == name].resample(interval, on='started_at')['durration'].mean().dropna(how='all')
+    data_df = data_df.loc[data_df['name'] == name].resample(interval, on='started_at')['durration'].mean().dropna(how='all')
   elif method == 'median':
-    data_df = df.loc[df['name'] == name].resample(interval, on='started_at')['durration'].median().dropna(how='all')
+    data_df = data_df.loc[data_df['name'] == name].resample(interval, on='started_at')['durration'].median().dropna(how='all')
   else:
     return "" #FIXME: return error
   
@@ -121,8 +125,8 @@ def proccess_data(wf_id, name, conclusion='both', method='mean', interval='d', r
 
   # TODO: make duration also as variable (secs, mins)
   data = {
-    "started_at": data_df.index.tolist(),
-    "durration_min": data_df.tolist(),
+    "durration_min": data_df.index.tolist(),
+    "started_at": data_df.tolist(),
   }
   return data
 
