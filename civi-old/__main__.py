@@ -3,7 +3,7 @@ import sys
 import json
 import asyncio
 
-from civi import app
+from civi import syncer
 
 
 def log(msg):
@@ -27,4 +27,4 @@ if __name__ == '__main__':
     log(f'using database: {DB_PATH}, and github auth-token: {TOKEN}')
     log('start main...')
 
-    asyncio.run(app.main(DB_PATH, TOKEN))
+    asyncio.run(syncer.main(DB_PATH, TOKEN))

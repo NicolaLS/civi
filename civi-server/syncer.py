@@ -6,8 +6,6 @@ import aiosqlite
 from aiosqlite import IntegrityError
 import sys
 
-from civi import vi
-
 # dont do this
 REPO_URL = None
 
@@ -228,20 +226,16 @@ async def fetch_elements(tag, session, endpoint,  page):
     
     return (int(total_count), elements)
 
-async def main(DB_PATH, TOKEN):
+async def run_syncer(db_path, token):
     #TODO as cmd arg
     #TODO with connect as db..
-    db = await aiosqlite.connect(DB_PATH)
+    db = await aiosqlite.connect(db_path)
     await init_db(db)    
 
-    HEADERS = { 'Accept': 'application/json', 'Authorization': 'Bearer ' + TOKEN, 'User-Agent': 'CI-VI / 1.0 Github CI Visualization'}
+    HEADERS = { 'Accept': 'application/json', 'Authorization': 'Bearer ' + token, 'User-Agent': 'CI-VI / 1.0 Github CI Visualization'}
     async with aiohttp.ClientSession('https://api.github.com', headers=HEADERS) as session:
         global REPO_URL
         REPO_URL = '/repos/fedimint/fedimint'
-        while True:
-            await sync('runs-0', db, session, '/actions/runs')
-            await db.close()
-            vi.visualize(DB_PATH)
-            db = await aiosqlite.connect(DB_PATH)
-            await log('finished, waiting one hour..')
-            await asyncio.sleep(3600)
+        await sync('runs-0', db, session, '/actions/runs')
+        await db.close()
+

@@ -1,4 +1,5 @@
-civi/__pycache__
+*/__pycache__
 *.db
 config.json
 plots/*
+venv/*
