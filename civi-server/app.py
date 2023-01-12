@@ -43,7 +43,7 @@ def syncer_worker(lock):
     # most of the time
     with lock:
       df = pd.read_sql("""SELECT jobs.id, jobs.run_id, jobs.run_attempt, jobs.started_at, jobs.completed_at, 
-      jobs.name, runs.workflow_id FROM jobs INNER JOIN runs ON jobs.run_id=runs.id WHERE
+      jobs.name, jobs.conclusion, runs.workflow_id FROM jobs INNER JOIN runs ON jobs.run_id=runs.id WHERE
       jobs.status='completed' AND jobs.conclusion IN ('success', 'failure')""", conn)
       df['started_at']= pd.to_datetime(df['started_at'])
       df['completed_at']= pd.to_datetime(df['completed_at'])
@@ -57,7 +57,7 @@ conn = sqlite3.connect(db_path, check_same_thread=False)
 lock = threading.Lock()
 # we don't need to use the lock yet, since the syncer_worker hasn't started
 df = pd.read_sql("""SELECT jobs.id, jobs.run_id, jobs.run_attempt, jobs.started_at, jobs.completed_at, 
-jobs.name, runs.workflow_id FROM jobs INNER JOIN runs ON jobs.run_id=runs.id WHERE
+jobs.name, jobs.conclusion, runs.workflow_id FROM jobs INNER JOIN runs ON jobs.run_id=runs.id WHERE
 jobs.status='completed' AND jobs.conclusion IN ('success', 'failure')""", conn)
 df['started_at']= pd.to_datetime(df['started_at'])
 df['completed_at']= pd.to_datetime(df['completed_at'])
@@ -95,11 +95,16 @@ def job(wf_id, job_name):
     }
     method = request.args.get('method')
     interval = request.args.get('interval')
-    data = proccess_data(wf_id, job_name, method, interval, rolling)
+    conclusion = request.args.get('conclusion')
+    data = proccess_data(wf_id, job_name, conclusion, method, interval, rolling)
     return data
 
-def proccess_data(wf_id, name, method='mean', interval='d', rolling=None):
+def proccess_data(wf_id, name, conclusion='both', method='mean', interval='d', rolling=None):
   data_df = df[(df['name'] == name) & (df['workflow_id'] == wf_id)]
+  if conclusion != 'both':
+    data_df = data_df[data_df['conclusion'] == conclusion]
+    # this can make the server crash if api consumer sets conclusion wrong
+
   if method == 'mean':
     data_df = df.loc[df['name'] == name].resample(interval, on='started_at')['durration'].mean().dropna(how='all')
   elif method == 'median':
@@ -120,3 +125,6 @@ def proccess_data(wf_id, name, method='mean', interval='d', rolling=None):
     "durration_min": data_df.tolist(),
   }
   return data
+
+if __name__ == "__main__":
+  app.run(host='0.0.0.0')
